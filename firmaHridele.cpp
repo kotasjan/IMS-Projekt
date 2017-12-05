@@ -1,7 +1,7 @@
 /*
  * @file firmaHridele.cpp
  * @author Jan Kotas<xkotas07@stud.fit.vutbr.cz>
- * @author Matuš Burzala<xburza@stud.fit.vutbr.cz>
+ * @author Matúš Burzala<xburza00@stud.fit.vutbr.cz>
  */
 
 #include <iostream>
