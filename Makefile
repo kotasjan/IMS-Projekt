@@ -8,7 +8,9 @@ all: $(NAME).o
 clean:
 	rm -f $(NAME)
 
-run: 
+run: $(NAME).o
+	$(CFLAGS) -o $(NAME) $(NAME).o -lsimlib -lm
+	rm -f *.o
 	./$(NAME)
 
 test:
