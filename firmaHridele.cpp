@@ -30,7 +30,7 @@ const int POCET_ZAMESTNANCU = 4;
 const int SERIE_KUSU = 5;
 
 // Počet generovaných surových kusů za jednotku času (perioda generovaní).
-const int POCET_GENEROVANYCH_KUSU = 300;
+const int POCET_GENEROVANYCH_KUSU = 260;
 
 // Perioda generovaní představuje periodu dodávky surových kusů z dodavatelské firmy.
 const int PERIODA_GENEROVANI = 7 * DEN;
@@ -55,7 +55,7 @@ const double PRAVDEPODOBNOST_DOVOLENE = 0.119;
 const int PRACOVNI_DOBA = 8 * HODINA;
 
 // Simulační doba představuje délku simulace v simulačním čase.
-const double SIMULACNI_DOBA = 50 * ROK;
+const double SIMULACNI_DOBA = 5 * ROK;
 
 
 /*
@@ -114,25 +114,29 @@ int celkovy_pocet_hrideli = 0; // Představuje celkový počet hřídelí.
 // Počet zaměstnanců, kteří aktuálně pracují (na začátku simulace pracují všichni)
 int pocet_pracujicich_zamestnancu = POCET_ZAMESTNANCU;
 
-// TStat delka_fronty_materialu("Delka pocatecni fronty surovych kusu", 0);
-// TStat delka_fronty_vyvrtanych_kusu("Delka fronty vyvrtanych kusu", 0);
-// TStat delka_fronty_vysoustruzenych_kusu("Delka fronty vysoustruzenych kusu",
-// 0);
-// TStat delka_fronty_vyfrezovanych_kusu("Delka fronty vyfrezovanych kusu", 0);
-// TStat delka_fronty_vybrousenych_kusu("Delka fronty vybrousenych kusu", 0);
-// TStat pocet_vyrobenych_hrideli("Pocet vyrobenych hrideli", 0);
+// Histogram celkové doby výroby od vstupu surového kusu až po finální hřídel.
+Histogram doba_vyroby("Doba surových kusů v systému", 0, 1*DEN, 21);
 
+// Statistika zobrazující efektivitu zaměstanců v procentech podle odpracovaného času.
+Stat efektivita_zamestnance;
 
 /*
  * Tato classa představuje transakce vyrobených hřídelí.
 */
 class HRIDEL : public Process {
+  double prichod; // představuje informaci o času vstupu materiálu do systému
+
   void Behavior() {
     q_hridele.Insert(this);
     celkovy_pocet_hrideli++;
+    doba_vyroby(Time - prichod);
     Passivate();
     Cancel();
   }
+  public:
+  // Při vytvoření hridele předáváme konstruktoru informaci o vstupnim case materialu
+  // do systemu.
+  HRIDEL(double prichod_noveho_kusu) : prichod(prichod_noveho_kusu) { Activate(); }
 };
 
 /*
@@ -142,6 +146,7 @@ class HRIDEL : public Process {
 
 class VYFREZOVANY_KUS : public Process {
   bool correct; // představuje informaci o tom, zda se jedná o povedený kus
+  double prichod; // představuje informaci o času vstupu materiálu do systému
 
   void Behavior() {
     q_vyfrezovane_kusy.Insert(this); // přidej do fronty čekajících vyfrézovaných kusů
@@ -158,7 +163,7 @@ class VYFREZOVANY_KUS : public Process {
       Passivate();
     }
 
-    (new HRIDEL)->Activate(); // vytvoří nová transakci HŘÍDEL a aktivuje se
+    new HRIDEL(prichod); // vytvoří novou transakci HŘÍDEL a předá čas vstupu materiálu do systému
 
     Cancel(); // transakce se ukončí
   }
@@ -166,6 +171,13 @@ class VYFREZOVANY_KUS : public Process {
  public:
   // tento getter slouží pro informování zaměstnance o stavu výrobku
   int getQuality() { return this->correct; } 
+
+  // vrátí dobu příchodu materiálu
+  double getPrichod() { return this->prichod; };
+
+  // Při vytvoření vyfrezovaneho kusu předáváme konstruktoru informaci o vstupnim case materialu
+  // do systemu.
+  VYFREZOVANY_KUS(double prichod_noveho_kusu) : prichod(prichod_noveho_kusu) { Activate(); }
 };
 
 /*
@@ -175,6 +187,7 @@ class VYFREZOVANY_KUS : public Process {
 
 class VYSOUSTRUZENY_KUS : public Process {
   bool correct; // představuje informaci o tom, zda se jedná o povedený kus
+  double prichod; // představuje informaci o času vstupu materiálu do systému
 
   void Behavior() {
     q_vysoustruzene_kusy.Insert(this); // přidej do fronty čekajících vysoustružených kusů
@@ -191,7 +204,7 @@ class VYSOUSTRUZENY_KUS : public Process {
       Passivate();
     }
 
-    (new VYFREZOVANY_KUS)->Activate(); // vytvoří nová transakci VYFREZOVANY_KUS a aktivuje se
+    new VYFREZOVANY_KUS(prichod); // vytvoří se nová transakce VYFREZOVANY_KUS a předá se čas příchodu materiálu do systému.
 
     Cancel(); // transakce se ukončí
   }
@@ -199,6 +212,13 @@ class VYSOUSTRUZENY_KUS : public Process {
  public:
   // tento getter slouží pro informování zaměstnance o stavu výrobku
   int getQuality() { return this->correct; }
+
+  // vrátí dobu příchodu materiálu
+  double getPrichod() { return this->prichod; };
+
+  // Při vytvoření vysoustruženého kusu předáváme konstruktoru informaci o vstupnim case materiálu
+  // do systemu.
+  VYSOUSTRUZENY_KUS(double prichod_noveho_kusu) : prichod(prichod_noveho_kusu) { Activate(); }
 };
 
 /*
@@ -208,6 +228,7 @@ class VYSOUSTRUZENY_KUS : public Process {
 
 class VYVRTANY_KUS : public Process {
   bool correct; // představuje informaci o tom, zda se jedná o povedený kus
+  double prichod; // představuje informaci o času vstupu materiálu do systému
 
   void Behavior() {
     q_vyvrtane_kusy.Insert(this); // přidej do fronty čekajících vyvrtaných kusů
@@ -224,7 +245,7 @@ class VYVRTANY_KUS : public Process {
       Passivate();
     }
 
-    (new VYSOUSTRUZENY_KUS)->Activate(); // vytvoří nová transakci VYSOUSTRUZENY_KUS a aktivuje se
+    new VYSOUSTRUZENY_KUS(prichod); // vytvoří se nová transakce VYSOUSTRUZENY_KUS a předá se čas příchodu materiálu do systému.
 
     Cancel(); // transakce se ukončí
   }
@@ -232,6 +253,13 @@ class VYVRTANY_KUS : public Process {
  public:
   // tento getter slouží pro informování zaměstnance o stavu výrobku
   int getQuality() { return this->correct; }
+
+  // vrátí dobu příchodu materiálu
+  double getPrichod() { return this->prichod; };
+
+  // Při vytvoření vyvrtaného kusu předáváme konstruktoru informaci o vstupnim case materiálu
+  // do systemu.
+  VYVRTANY_KUS(double prichod_noveho_kusu) : prichod(prichod_noveho_kusu) { Activate(); }
 };
 
 /*
@@ -241,9 +269,11 @@ class VYVRTANY_KUS : public Process {
 
 class SUROVY_KUS : public Process {
   bool correct; // představuje informaci o tom, zda se jedná o povedený kus
+  double prichod; // představuje informaci o času vstupu materiálu do systému
 
   void Behavior() {
     q_surove_kusy.Insert(this); // přidej do fronty čekajících surových kusů
+    prichod = Time;
 
     Passivate();
 
@@ -257,7 +287,7 @@ class SUROVY_KUS : public Process {
       Passivate();
     }
 
-    (new VYVRTANY_KUS)->Activate(); // vytvoří nová transakci VYVRTANY_KUS a aktivuje se
+    new VYVRTANY_KUS(prichod); // vytvoří se nová transakce VYVRTANY_KUS a předá se čas vstupu materiálu do systému.
 
     Cancel(); // transakce se ukončí
   }
@@ -265,6 +295,11 @@ class SUROVY_KUS : public Process {
  public:
   // tento getter slouží pro informování zaměstnance o stavu výrobku
   int getQuality() { return this->correct; }
+
+  // vrátí dobu příchodu materiálu
+  double getPrichod() { return this->prichod; };
+
+  SUROVY_KUS(int priorita) : Process(priorita) { Activate(); }
 };
 
 /*
@@ -276,6 +311,7 @@ class SUROVY_KUS : public Process {
 class ZAMESTNANEC : public Process {
   int dovolena; // Počet zbývajících dnů dovolené.
   int pocet_hotovych_kusu = 0; // počet zdařilých kusů v každé sérii
+  double efektivni_odpracovana_doba = PRACOVNI_DOBA; // doba, po kterou zamestnanec opravdu pracoval
 
   void Behavior() {
     while (1) {
@@ -355,18 +391,28 @@ class ZAMESTNANEC : public Process {
           // Pokud zaměstnanec dokončil sérii a stále je pracovní směna, má nárok na přestávku.
           if (pocet_hotovych_kusu != 0 && smena) {
             if (Random() <= 0.5) {
-              Wait(Exponential(5 * MINUTA)); // Zaměstnanec má přestávku exp(5min).
+              double t = Exponential(5 * MINUTA);
+              Wait(t); // Zaměstnanec má přestávku exp(5min).
+              efektivni_odpracovana_doba -= t; // odečteme přestávku od efektivní pracovní doby
             }
             pocet_hotovych_kusu = 0;
           } else {
             Wait(5);
+            // odečteme dobu čekání na zařízení
+            efektivni_odpracovana_doba -= 5;
           }
 
           // Pokud je simulace u konce, ukončíme činńost zaměstnanců předtím,
           // než si zabere zařízení.
           if(Time >= SIMULACNI_DOBA - 2 * HODINA) this->Cancel();
         }
+
+        // výpočet efektivity zaměstnance na konci směny a přidání do statistik
+        efektivita_zamestnance((int)((efektivni_odpracovana_doba / PRACOVNI_DOBA) * 100));
+
       }
+      // na konci směny se obnoví počáteční hodnoty
+      efektivni_odpracovana_doba = PRACOVNI_DOBA;
       pocet_hotovych_kusu = 0;
       Passivate();
     }
@@ -378,12 +424,16 @@ class ZAMESTNANEC : public Process {
 
     Queue pom_q; // Pomocná fronta pro zpracování surových kusů.
 
+
+
     while (pom_q.Length() != SERIE_KUSU) {
       if (!q_surove_kusy.Empty())
         // Vybere se počet kusů splňující sérii a vloží se do pomocné fronty.
         pom_q.Insert(q_surove_kusy.GetFirst());
-      else
+      else {
         Wait(5);
+        efektivni_odpracovana_doba -= 5;
+      }
     }
 
     while (pom_q.Length() != 0) {
@@ -394,8 +444,8 @@ class ZAMESTNANEC : public Process {
         // Provádění práce na stroji.
         Wait(14.4 * MINUTA);
 
-        // Kontrola výrobku.
-        Wait(30);
+        // Kontrola a manipulace s výrobkem.
+        Wait(Exponential(30));
 
         // Zjistíme výsledek kontroly výrobku.
         if (k->getQuality()) {
@@ -411,8 +461,10 @@ class ZAMESTNANEC : public Process {
       // přesunou se nedodělané kusy zpět do původní fronty a cyklus se přeřuší.
       if (!smena) {
         while (!pom_q.Empty()){
-          (pom_q.GetFirst())->Cancel();
-          (new SUROVY_KUS)->Activate();
+          SUROVY_KUS *p = (SUROVY_KUS *)pom_q.GetFirst();
+          double time = p->getPrichod();
+          p->Activate();
+          new SUROVY_KUS(1);
         }
         break;
       }
@@ -447,8 +499,10 @@ class ZAMESTNANEC : public Process {
       if (!q_vyvrtane_kusy.Empty())
         // Vybere se počet kusů splňující sérii a vloží se do pomocné fronty.
         pom_q.Insert(q_vyvrtane_kusy.GetFirst());
-      else
+      else {
         Wait(5);
+        efektivni_odpracovana_doba -= 5;
+      }
     }
 
     while (pom_q.Length() != 0) {
@@ -459,8 +513,8 @@ class ZAMESTNANEC : public Process {
         // Provádění práce na stroji.
         Wait(6.1 * MINUTA);
 
-        // Kontrola výrobku.
-        Wait(30);
+        // Kontrola a manipulace s výrobkem.
+        Wait(Exponential(30));
 
         // Zjistíme výsledek kontroly výrobku.
         if (k->getQuality()) {
@@ -470,16 +524,16 @@ class ZAMESTNANEC : public Process {
           pocet_zmetku++;
           k->Cancel(); // Výrobek nekvalitní, tak ukončíme jeho činnost.
         }
-      } else {
-        Wait(5);
       }
 
       // Pokud nastane situace, že skončí směna a zaměstnanec nedokončil sérii,
       // přesunou se nedodělané kusy zpět do původní fronty a cyklus se přeřuší.
       if (!smena) {
         while (!pom_q.Empty()){
-          (pom_q.GetFirst())->Cancel();
-          (new VYVRTANY_KUS)->Activate();
+          VYVRTANY_KUS *p = (VYVRTANY_KUS *)pom_q.GetFirst();
+          double time = p->getPrichod();
+          p->Activate();
+          new VYVRTANY_KUS(time);
         }
         break;
       }
@@ -515,8 +569,10 @@ class ZAMESTNANEC : public Process {
       if (!q_vysoustruzene_kusy.Empty())
         // Vybere se počet kusů splňující sérii a vloží se do pomocné fronty.
         pom_q.Insert(q_vysoustruzene_kusy.GetFirst());
-      else
+      else {
         Wait(5);
+        efektivni_odpracovana_doba -= 5;
+      }
     }
 
     while (pom_q.Length() != 0) {
@@ -527,8 +583,8 @@ class ZAMESTNANEC : public Process {
         // Provádění práce na stroji.
         Wait(7.3 * MINUTA);
 
-        // Kontrola výrobku.
-        Wait(30);
+        // Kontrola a manipulace s výrobkem.
+        Wait(Exponential(30));
 
         // Zjistíme výsledek kontroly výrobku.
         if (k->getQuality()) {
@@ -538,16 +594,16 @@ class ZAMESTNANEC : public Process {
           pocet_zmetku++;
           k->Cancel(); // Výrobek nekvalitní, tak ukončíme jeho činnost.
         }
-      } else {
-        Wait(5);
       }
 
       // Pokud nastane situace, že skončí směna a zaměstnanec nedokončil sérii,
       // přesunou se nedodělané kusy zpět do původní fronty a cyklus se přeřuší.
       if (!smena) {
         while (!pom_q.Empty()){
-          (pom_q.GetFirst())->Cancel();
-          (new VYSOUSTRUZENY_KUS)->Activate();
+          VYSOUSTRUZENY_KUS *p = (VYSOUSTRUZENY_KUS *)pom_q.GetFirst();
+          double time = p->getPrichod();
+          p->Activate();
+          new VYSOUSTRUZENY_KUS(time);
         }
         break;
       }
@@ -583,8 +639,10 @@ class ZAMESTNANEC : public Process {
       if (!q_vyfrezovane_kusy.Empty())
         // Vybere se počet kusů splňující sérii a vloží se do pomocné fronty.
         pom_q.Insert(q_vyfrezovane_kusy.GetFirst());
-      else
+      else {
         Wait(5);
+        efektivni_odpracovana_doba -= 5;
+      }
     }
 
     while (pom_q.Length() != 0) {
@@ -595,8 +653,8 @@ class ZAMESTNANEC : public Process {
         // Provádění práce na stroji.
         Wait(5.2 * MINUTA);
 
-        // Kontrola výrobku.
-        Wait(30);
+        // Kontrola a manipulace s výrobkem.
+        Wait(Exponential(30));
 
         // Zjistíme výsledek kontroly výrobku.
         if (k->getQuality()) {
@@ -606,16 +664,16 @@ class ZAMESTNANEC : public Process {
           pocet_zmetku++;
           k->Cancel(); // Výrobek nekvalitní, tak ukončíme jeho činnost.
         }
-      } else {
-        Wait(5);
       }
 
       // Pokud nastane situace, že skončí směna a zaměstnanec nedokončil sérii,
       // přesunou se nedodělané kusy zpět do původní fronty a cyklus se přeřuší.
       if (!smena) {
         while (!pom_q.Empty()){
-          (pom_q.GetFirst())->Cancel();
-          (new VYFREZOVANY_KUS)->Activate();
+          VYFREZOVANY_KUS *p = (VYFREZOVANY_KUS *)pom_q.GetFirst();
+          double time = p->getPrichod();
+          p->Activate();
+          new VYFREZOVANY_KUS(time);
         }
         break;
       }
@@ -669,22 +727,27 @@ class GEN_ZAMESTNANCU : public Event {
 /*
  * Tento event se stará o periodické generování surových kusů.
  * Tyto surové kusy se následně vloží do fronty surových kusů
- * a jsou připravené pro zpracování obslužnou linkou.
+ * a jsou připravené pro zpracování obslužnou linkou. Dulezite
+ * je pohlidat mnozstvi surovych kusu ve vstupni fronte. Pokud
+ * je mnozstvi kusu vetsi nez pocet generovanych kusu, generovani
+ * se nespusti.
 */
 class GEN_SUROVYCH_KUSU : public Event {
   void Behavior() {
-    for (int i = 0; i < POCET_GENEROVANYCH_KUSU; i++)
-      (new SUROVY_KUS)->Activate();
-    if (debug) {
-      unsigned long long t = Time;
-      cout << setw(3) << (int)t / ROK << "r, " << setw(3)
-           << (int)(t % ROK) / DEN << "d,  " << setw(2)
-           << (int)(t % DEN) / HODINA << ":" << setw(2)
-           << (int)(t % HODINA) / MINUTA << ":" << setw(2) << (t % MINUTA)
-           << "     ::  "
-           << ("Vygenerováno " + to_string(POCET_GENEROVANYCH_KUSU) +
-               " surových kusů.")
-           << endl;
+    if(q_surove_kusy.Length() < POCET_GENEROVANYCH_KUSU) {
+      for (int i = 0; i < POCET_GENEROVANYCH_KUSU; i++)
+        new SUROVY_KUS(0);
+      if (debug) {
+        unsigned long long t = Time;
+        cout << setw(3) << (int)t / ROK << "r, " << setw(3)
+             << (int)(t % ROK) / DEN << "d,  " << setw(2)
+             << (int)(t % DEN) / HODINA << ":" << setw(2)
+             << (int)(t % HODINA) / MINUTA << ":" << setw(2) << (t % MINUTA)
+             << "     ::  "
+             << ("Vygenerováno " + to_string(POCET_GENEROVANYCH_KUSU) +
+                 " surových kusů.")
+             << endl;
+      }
     }
 
     // Nastaví se aktivace následujího eventu po uplynutí předem určené periody.
@@ -895,19 +958,19 @@ int main(int argc, char **argv) {
 
   // Nastavení názvů vrtaček.
   for (int i = 0; i < POCET_VRTACEK; i++) {
-    f_vrtacka[i].SetName(("Vrtacka " + to_string(i + 1)).c_str());
+    f_vrtacka[i].SetName("Vrtacka");
   }
   // Nastavení názvů soustruhů.
   for (int i = 0; i < POCET_SOUSTRUHU; i++) {
-    f_soustruh[i].SetName(("Soustruh " + to_string(i + 1)).c_str());
+    f_soustruh[i].SetName("Soustruh");
   }
   // Nastavení názvů fréz.
   for (int i = 0; i < POCET_FREZ; i++) {
-    f_freza[i].SetName(("Freza " + to_string(i + 1)).c_str());
+    f_freza[i].SetName("Freza");
   }
   // Nastavení názvů brusek.
   for (int i = 0; i < POCET_BRUSEK; i++) {
-    f_bruska[i].SetName(("Bruska " + to_string(i + 1)).c_str());
+    f_bruska[i].SetName("Bruska");
   }
 
   // Aktivace události blížícího se konce simulace den před koncem simulace.
@@ -943,4 +1006,11 @@ int main(int argc, char **argv) {
   for (int i = 0; i < POCET_FREZ; i++) f_freza[i].Output();
 
   for (int i = 0; i < POCET_BRUSEK; i++) f_bruska[i].Output();
+
+  // Tisk histogramu doby výroby hřídele
+
+  doba_vyroby.Output();
+
+  // Tisk statistiky efektivity zaměstnanců.
+  efektivita_zamestnance.Output();
 }
