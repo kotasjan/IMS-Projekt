@@ -12,7 +12,3 @@ run: $(NAME).o
 	$(CFLAGS) -o $(NAME) $(NAME).o -lsimlib -lm
 	rm -f *.o
 	./$(NAME)
-
-test:
-	./$(NAME)
-	cat stats.out

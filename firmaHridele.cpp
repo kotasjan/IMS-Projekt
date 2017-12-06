@@ -1015,8 +1015,6 @@ class GEN_END : public Event {
 int main(int argc, char **argv) {
   RandomSeed(time(NULL));
 
-  if (debug) SetOutput("stats.out");
-
   // Inicializace experimentu.
   Init(0, SIMULACNI_DOBA);
 
